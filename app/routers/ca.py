@@ -1,11 +1,17 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from ..fake_data import pv_list
+
 
 router = APIRouter(
     prefix="/ca",
     tags=["Channel Access"],
     responses={404: {"description": "Not found"}},
 )
+
+
+@router.get("/")
+async def read_root():
+    return {"Hello": "from CA"}
 
 
 @router.get("/info/{pv_name}")
@@ -17,11 +23,16 @@ async def cainfo(pv_name: str):
 
 
 @router.get("/get/{pv_name}")
-async def caget(pv_name: str):
-    res = next((pv for pv in pv_list if pv.name == pv_name), None)
-    if res is None:
-        raise HTTPException(status_code=404, detail="PV not found")
-    return res
+async def caget(pv_name: str, request: Request):
+    ca = request.state.ca
+    pvs = await ca.get_pvs(pv_name)
+
+    try:
+        res = await pvs[0].read()
+    except TimeoutError:
+        raise HTTPException(status_code=408, detail="Timeout")
+
+    return {"value": res.data[0]}
 
 
 @router.get("/get_many")
