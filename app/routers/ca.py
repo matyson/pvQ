@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Query
+from typing import Annotated
 from ..fake_data import pv_list
 
 
@@ -36,11 +37,19 @@ async def caget(pv_name: str, request: Request):
 
 
 @router.get("/get_many")
-async def caget_many(pv: str):
-    res = [v for v in pv_list if v.name in pv]
-    if len(res) == 0:
-        raise HTTPException(status_code=404, detail="PVs not found")
-    return res
+async def caget_many(pv: Annotated[list[str], Query()], request: Request):
+    ca = request.state.ca
+    pvs = await ca.get_pvs(*pv)
+    print(pvs)
+
+    values = []
+    for pv in pvs:
+        try:
+            res = await pv.read()
+        except TimeoutError:
+            raise HTTPException(status_code=408, detail="Timeout")
+        values.append({"name": pv.name, "value": res.data[0]})
+    return values
 
 
 @router.put("/put/{pv_name}")
