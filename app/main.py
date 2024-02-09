@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from .routers import ca
 from contextlib import asynccontextmanager
 from caproto.asyncio.client import Context
+from .dependencies import verify_token
 
 
 async def ca_context():
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
+    dependencies=[Depends(verify_token)],
     lifespan=lifespan,
     title="EPICS PV API",
     description="An API for interacting with EPICS PVs",
