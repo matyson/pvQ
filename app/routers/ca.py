@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Request, Query
+from ..models import PVModel, Status
 from typing import Annotated
 from ..fake_data import pv_list
+from caproto import ReadNotifyResponse
 
 
 router = APIRouter(
@@ -16,11 +18,8 @@ async def read_root():
 
 
 @router.get("/info/{pv_name}")
-async def cainfo(pv_name: str):
-    res = next((pv for pv in pv_list if pv.name == pv_name), None)
-    if res is None:
-        raise HTTPException(status_code=404, detail="PV not found")
-    return res
+async def cainfo(pv_name: str, request: Request):
+    return {"info": "TO DO"}
 
 
 @router.get("/get/{pv_name}")
@@ -33,14 +32,42 @@ async def caget(pv_name: str, request: Request):
     except TimeoutError:
         raise HTTPException(status_code=408, detail="Timeout")
 
-    return {"value": res.data[0]}
+    # my data is a python builtin or numpy array, so I need to convert it to a list to be able to serialize it
+    if isinstance(res.data, (list, tuple)):
+        return PVModel(
+            name=pv_name,
+            data=res.data,
+            status=Status(
+                name=res.status.name,
+                code=res.status.code,
+                code_with_severity=res.status.code_with_severity,
+                severity=res.status.severity,
+                success=res.status.success,
+                description=res.status.description,
+            ),
+            data_type=res.data_type,
+            data_count=res.data_count,
+        )
+    return PVModel(
+        name=pv_name,
+        data=res.data.tolist(),
+        status=Status(
+            name=res.status.name,
+            code=res.status.code,
+            code_with_severity=res.status.code_with_severity,
+            severity=res.status.severity,
+            success=res.status.success,
+            description=res.status.description,
+        ),
+        data_type=res.data_type,
+        data_count=res.data_count,
+    )
 
 
 @router.get("/get_many")
 async def caget_many(pv: Annotated[list[str], Query()], request: Request):
     ca = request.state.ca
     pvs = await ca.get_pvs(*pv)
-    print(pvs)
 
     values = []
     for pv in pvs:

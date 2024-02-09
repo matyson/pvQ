@@ -1,4 +1,4 @@
-from .models import PVInfo, PVGet
+from .models import PVInfo
 
 pv_list: list[PVInfo] = [
     PVInfo(
